@@ -1,0 +1,144 @@
+🔐 1️⃣ Admin Login & Security (must)
+
+Admin login (email + password)
+
+Role based access (future ready)
+
+Change password
+
+Logout
+
+👥 2️⃣ User Management
+Customers
+
+Customer list
+
+View profile
+
+Block / unblock
+
+Delete user
+
+View booking history
+
+Service Providers
+
+Provider list
+
+Verify / approve provider
+
+Reject provider
+
+Block / unblock
+
+Provider documents (ID, certificates)
+
+Provider rating & reviews
+
+🛠 3️⃣ Service Management
+
+Service categories (Plumber, Electrician, etc.)
+
+Add / edit / delete category
+
+Services list
+
+Enable / disable services
+
+Set base pricing rules (optional)
+
+📅 4️⃣ Booking Management (very important)
+
+All bookings list
+
+Booking status:
+
+pending
+
+accepted
+
+in-progress
+
+completed
+
+cancelled
+
+Assign provider (manual override)
+
+Cancel booking (admin power)
+
+View booking details
+
+💰 5️⃣ Payment & Commission
+
+View all payments
+
+Provider payout status
+
+Platform commission %
+
+Pending / completed payouts
+
+Refund management
+
+Transaction history
+
+⭐ 6️⃣ Reviews & Ratings
+
+View reviews
+
+Delete fake reviews
+
+Block abusive users
+
+Rating analytics (avg rating per provider)
+
+📊 7️⃣ Dashboard (overview screen)
+
+Total users
+
+Total providers
+
+Total bookings
+
+Today’s bookings
+
+Revenue summary
+
+Active providers
+
+🚨 8️⃣ Reports & Complaints
+
+User complaints
+
+Provider complaints
+
+Booking issues
+
+Resolve / close ticket
+
+Admin notes
+
+📢 9️⃣ Content & App Control
+
+App banners
+
+Announcements
+
+Offers / coupons
+
+Push notifications (later)
+
+Email templates
+
+⚙️ 10️⃣ Settings (admin-only)
+
+Platform commission %
+
+Cancellation rules
+
+Terms & conditions
+
+Privacy policy
+
+App on/off (maintenance mode)

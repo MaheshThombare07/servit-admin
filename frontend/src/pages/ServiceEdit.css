@@ -1,0 +1,140 @@
+/* Service Edit Page Styles */
+
+.service-edit-page {
+  padding: 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.service-edit-page .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.service-edit-page .page-header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.service-details-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 6px var(--shadow);
+}
+
+.service-details-card .card-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.subservices-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 4px 6px var(--shadow);
+}
+
+.subservices-card .card-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.form.inline {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: var(--bg);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.form.inline input,
+.form.inline select {
+  flex: 1;
+  min-width: 150px;
+}
+
+.subservices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.subservice-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  background: var(--bg);
+  transition: all 0.2s ease;
+  gap: 16px;
+}
+
+.subservice-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.subservice-item .item-content {
+  flex: 1;
+}
+
+.subservice-item .item-title {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.subservice-item .item-meta {
+  color: var(--muted);
+  font-size: 14px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.subservice-item .item-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .service-edit-page {
+    padding: 16px;
+  }
+  .form.inline {
+    flex-direction: column;
+  }
+  .subservice-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .subservice-item .item-actions {
+    width: 100%;
+  }
+}

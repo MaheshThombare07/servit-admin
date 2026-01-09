@@ -30,7 +30,8 @@ export function ensureFirebaseInitialized() {
   const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
 
   if (!projectId || !clientEmail || !privateKey) {
-    console.warn('[firebase] Missing service account envs. Provide FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY');
+    console.error('[firebase] Missing service account envs. Provide FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY');
+    throw new Error('Firebase credentials not properly configured. Please check your .env file.');
   }
 
   if (!admin.apps.length) {

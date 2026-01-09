@@ -1,8 +1,117 @@
 import axios from 'axios'
 
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5050/api'
+const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5052/api'
 
-export const api = axios.create({ baseURL })
+const authTokenKey = 'servite_admin_token'
+
+export const api = axios.create({ 
+  baseURL,
+  timeout: 10000, // 10 second timeout
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(authTokenKey)
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// Global variable to store the clearAuth function
+let clearAuthFunction = null
+let isBootstrapping = false
+
+export const setClearAuthFunction = (fn) => {
+  clearAuthFunction = fn
+}
+
+export const setBootstrapping = (value) => {
+  isBootstrapping = value
+}
+
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    if (error?.response?.status === 401) {
+      // Clear token from localStorage
+      localStorage.removeItem(authTokenKey)
+      
+      // Clear AuthContext state if function is available
+      if (clearAuthFunction) {
+        clearAuthFunction()
+      }
+      
+      // Only redirect if we're not bootstrapping and not on login/register pages
+      if (!isBootstrapping && window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        console.log('Redirecting to login due to 401 error')
+        window.location.href = '/login'
+      } else {
+        console.log('Not redirecting during bootstrap or already on auth page')
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
+export function setAuthToken(token) {
+  if (token) {
+    localStorage.setItem(authTokenKey, token)
+  } else {
+    localStorage.removeItem(authTokenKey)
+  }
+}
+
+export const authKeys = { tokenKey: authTokenKey }
+
+export async function registerAdmin(payload) {
+  const { data } = await api.post('/auth/register', payload)
+  if (data?.token) setAuthToken(data.token)
+  return data
+}
+
+export async function createAdminUser(payload) {
+  const { data } = await api.post('/admin/register', payload)
+  return data
+}
+
+export async function getAllAdmins() {
+  const { data } = await api.get('/admins')
+  return data
+}
+
+export async function toggleAdminStatus(adminId, isActive) {
+  const { data } = await api.put(`/admin/${adminId}/status`, { isActive })
+  return data
+}
+
+export async function loginAdmin(email, password) {
+  const { data } = await api.post('/auth/login', { email, password })
+  if (data?.token) setAuthToken(data.token)
+  return data
+}
+
+export async function getCurrentAdmin() {
+  const { data } = await api.get('/auth/me')
+  return data
+}
+
+export async function logoutAdmin() {
+  try {
+    await api.post('/auth/logout')
+  } catch (e) {
+    // ignore logout errors
+  }
+  setAuthToken(null)
+}
+
+export async function refreshToken() {
+  const { data } = await api.post('/auth/refresh')
+  if (data?.token) setAuthToken(data.token)
+  return data
+}
 
 export async function getCategories() {
   const { data } = await api.get('/categories')

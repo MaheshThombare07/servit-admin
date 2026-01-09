@@ -6,13 +6,17 @@ import servicesRouter from './routes/services.js';
 import partnersRouter from './routes/partners.js';
 import usersRouter from './routes/users.js';
 import bookingsRouter from './routes/bookings.js';
+import authRouter from './routes/auth.js';
+import adminRouter from './routes/admin.js';
+import { requireAuth } from './middleware/auth.js';
 import { ensureFirebaseInitialized } from './lib/firebase.js';
 
 dotenv.config();
 
-ensureFirebaseInitialized();
-
 const app = express();
+
+// Initialize Firebase after dotenv config
+ensureFirebaseInitialized();
 
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*', credentials: true }));
 app.use(express.json({ limit: '1mb' }));
@@ -22,10 +26,15 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, env: process.env.NODE_ENV || 'development' });
 });
 
+app.use('/api', authRouter);
+
+// Protected routes below this line
+app.use('/api', requireAuth);
 app.use('/api', servicesRouter);
 app.use('/api', partnersRouter);
 app.use('/api', usersRouter);
 app.use('/api', bookingsRouter);
+app.use('/api', adminRouter);
 
 const PORT = process.env.PORT || 5050;
 app.listen(PORT, () => {

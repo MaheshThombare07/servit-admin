@@ -3,9 +3,27 @@ import fs from 'fs';
 import path from 'path';
 
 let initialized = false;
+let initializing = false;
 
 export function ensureFirebaseInitialized() {
   if (initialized) return admin;
+  
+  // Prevent multiple initialization attempts
+  if (initializing) {
+    // Wait for initialization to complete
+    const checkInterval = setInterval(() => {
+      if (initialized) {
+        clearInterval(checkInterval);
+        return admin;
+      }
+    }, 100);
+    
+    // Fallback timeout
+    setTimeout(() => clearInterval(checkInterval), 5000);
+    return admin;
+  }
+  
+  initializing = true;
 
   // Option 1: JSON file path
   const credsPath = process.env.FIREBASE_CREDENTIALS_PATH;
@@ -18,6 +36,7 @@ export function ensureFirebaseInitialized() {
         admin.initializeApp({ credential: admin.credential.cert(svc) });
       }
       initialized = true;
+      initializing = false;
       return admin;
     } catch (e) {
       console.error('[firebase] Failed to read FIREBASE_CREDENTIALS_PATH:', e.message);
@@ -41,6 +60,7 @@ export function ensureFirebaseInitialized() {
   }
 
   initialized = true;
+  initializing = false;
   return admin;
 }
 

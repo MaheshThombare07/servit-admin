@@ -2,6 +2,7 @@ import Joi from 'joi';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { db, ensureFirebaseInitialized } from '../lib/firebase.js';
+import { getCache, setCache } from '../../lib/cache.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1d';
@@ -71,16 +72,34 @@ export async function login(req, res) {
     return res.status(400).json({ ok: false, error: error.details.map(d => d.message).join(', ') });
   }
 
-  const snap = await db().collection('Admin').where('email', '==', value.email).limit(1).get();
-  if (snap.empty) {
-    return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+  // Check cache first
+  const cacheKey = `admin_${value.email}`;
+  let admin = getCache(cacheKey);
+  
+  if (!admin) {
+    const snap = await db().collection('Admin').where('email', '==', value.email).limit(1).get();
+    if (snap.empty) {
+      return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+    }
+    
+    const doc = snap.docs[0];
+    admin = { id: doc.id, ...doc.data() };
+    
+    // Cache the admin data (without password)
+    const adminForCache = { ...admin };
+    delete adminForCache.password;
+    setCache(cacheKey, adminForCache);
   }
-
-  const doc = snap.docs[0];
-  const admin = doc.data();
 
   if (admin.isActive === false) {
     return res.status(403).json({ ok: false, error: 'Account is disabled' });
+  }
+
+  // Need to fetch password for comparison if not in cache
+  if (!admin.password) {
+    const snap = await db().collection('Admin').doc(admin.id).get();
+    const fullAdmin = snap.data();
+    admin.password = fullAdmin.password;
   }
 
   const isMatch = await bcrypt.compare(value.password, admin.password || '');
@@ -88,11 +107,14 @@ export async function login(req, res) {
     return res.status(401).json({ ok: false, error: 'Invalid credentials' });
   }
 
-  const token = signToken({ id: doc.id, role: admin.role, access: admin.access || [] });
+  const token = signToken({ id: admin.id, role: admin.role, access: admin.access || [] });
+  const responseAdmin = { ...admin };
+  delete responseAdmin.password;
+  
   res.json({
     ok: true,
     token,
-    admin: { id: doc.id, ...admin, password: undefined },
+    admin: responseAdmin,
   });
 }
 

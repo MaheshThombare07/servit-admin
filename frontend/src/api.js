@@ -1,12 +1,12 @@
 import axios from 'axios'
 
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5052/api'
+const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5050/api'
 
 const authTokenKey = 'servite_admin_token'
 
 export const api = axios.create({ 
   baseURL,
-  timeout: 10000, // 10 second timeout
+  timeout: 30000, // 30 second timeout for Render
   headers: {
     'Content-Type': 'application/json'
   }

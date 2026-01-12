@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { createService, deleteService, getServices } from '../api'
+import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import './Services.css'
 
 export default function Services() {
@@ -25,10 +26,25 @@ export default function Services() {
     if (!form.name.trim()) return
     setSubmitting(true)
     try {
-      await createService(categoryId, { ...form, subServices: [] })
+      const newService = await createService(categoryId, { ...form, subServices: [] })
       setForm({ name: '', description: '', icon: '', isActive: true })
-      await load()
-    } finally { setSubmitting(false) }
+      // Add to state immediately instead of reloading
+      setItems(prev => [...prev, newService])
+    } finally { 
+      setSubmitting(false) 
+    }
+  }
+
+  async function onDelete(serviceId, serviceName) {
+    if (confirm(`Delete "${serviceName}" service?`)) {
+      try {
+        await deleteService(categoryId, serviceId)
+        // Remove from state immediately instead of reloading
+        setItems(prev => prev.filter(item => item.id !== serviceId))
+      } catch (error) {
+        console.error('Failed to delete service:', error)
+      }
+    }
   }
 
   return (
@@ -78,18 +94,21 @@ export default function Services() {
           </div>
           <div className="right">
             <button className="btn" type="submit" disabled={submitting}>
-              {submitting ? 'Creating...' : 'Create Service'}
+              {submitting ? <LoadingSpinner size="small" /> : 'Create Service'}
             </button>
           </div>
         </form>
       </div>
 
       {loading ? (
-        <div className="loading-state">Loading services...</div>
+        <div className="loading-state">
+          <LoadingSpinner size="large" />
+          <p>Loading services...</p>
+        </div>
       ) : items.length === 0 ? (
         <div className="empty-state">
           <h3>No Services Yet</h3>
-          <p>Add your first service using the form above</p>
+          <p>Add your first service using form above</p>
         </div>
       ) : (
         <div className="services-grid">
@@ -113,12 +132,7 @@ export default function Services() {
                 </Link>
                 <button 
                   className="btn danger outline" 
-                  onClick={async ()=>{ 
-                    if (confirm(`Delete "${s.name}" service?`)) { 
-                      await deleteService(categoryId, s.id); 
-                      await load(); 
-                    }
-                  }}
+                  onClick={() => onDelete(s.id, s.name)}
                 >
                   Delete
                 </button>

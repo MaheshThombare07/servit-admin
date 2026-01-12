@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import LoadingSpinner from '../components/LoadingSpinner.jsx'
 
 export default function Login() {
   const { login } = useAuth()
@@ -64,7 +65,7 @@ export default function Login() {
             </div>
           </label>
           <button type="submit" className="btn primary" disabled={loading}>
-            {loading ? 'Signing in...' : 'Login'}
+            {loading ? <LoadingSpinner size="small" /> : 'Login'}
           </button>
         </form>
         {/* <p className="muted small">

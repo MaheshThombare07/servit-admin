@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { addSubService, deleteSubService, getService, updateService, updateSubService } from '../api'
+import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import SubServiceModal from '../components/SubServiceModal'
+import Toast from '../components/Toast.jsx'
 import "./ServiceEdit.css"
 
 export default function ServiceEdit() {
@@ -12,6 +14,8 @@ export default function ServiceEdit() {
   const [form, setForm] = useState({ name: '', description: '', icon: '', isActive: true })
   const [newSub, setNewSub] = useState({ name: '', description: '', unit: 'per service', minPrice: 0, maxPrice: 0 })
   const [editingSubService, setEditingSubService] = useState(null)
+  const [addingSub, setAddingSub] = useState(false)
+  const [toast, setToast] = useState(null)
 
   async function load() {
     setLoading(true)
@@ -29,29 +33,132 @@ export default function ServiceEdit() {
     setSaving(true)
     try {
       await updateService(categoryId, serviceId, form)
-      await load()
-    } finally { setSaving(false) }
+      // Update state immediately instead of reloading
+      setSvc(prev => ({ ...prev, ...form }))
+    } finally { 
+      setSaving(false) 
+    }
   }
 
   async function onAddSub(e) {
     e.preventDefault()
     if (!newSub.name.trim()) return
-    await addSubService(categoryId, serviceId, newSub)
-    setNewSub({ name: '', description: '', unit: 'per service', minPrice: 0, maxPrice: 0 })
-    await load()
+    
+    // Check for duplicates in current state first
+    const normalizedName = newSub.name.trim().toLowerCase()
+    const existingSub = (svc.subServices || []).find(s => 
+      (s.name || '').toLowerCase() === normalizedName
+    )
+    
+    if (existingSub) {
+      setToast({ message: `Sub-service "${newSub.name.trim()}" already exists!`, type: 'error' })
+      return
+    }
+    
+    setAddingSub(true)
+    try {
+      // Generate temporary ID for optimistic update
+      const tempSub = { 
+        ...newSub, 
+        id: `temp_${Date.now()}`,
+        name: newSub.name.trim() 
+      }
+      
+      // Optimistic update - add to UI immediately
+      setSvc(prev => ({
+        ...prev,
+        subServices: [...(prev.subServices || []), tempSub]
+      }))
+      
+      // Reset form
+      setNewSub({ name: '', description: '', unit: 'per service', minPrice: 0, maxPrice: 0 })
+      
+      // API call
+      const result = await addSubService(categoryId, serviceId, newSub)
+      
+      // Replace temporary item with real data
+      setSvc(prev => ({
+        ...prev,
+        subServices: prev.subServices.map(sub => 
+          sub.id === tempSub.id ? result : sub
+        )
+      }))
+    } catch (error) {
+      console.error('Failed to add sub-service:', error)
+      
+      // Show user-friendly error message
+      if (error.response?.status === 409) {
+        setToast({ message: 'A sub-service with this name already exists!', type: 'error' })
+      } else {
+        setToast({ message: 'Failed to add sub-service. Please try again.', type: 'error' })
+      }
+      
+      // Remove optimistic update without full page reload
+      setSvc(prev => ({
+        ...prev,
+        subServices: prev.subServices.filter(sub => 
+          !sub.id.startsWith('temp_')
+        )
+      }))
+    } finally {
+      setAddingSub(false)
+    }
   }
 
   async function handleEditSubService(updatedData) {
     if (!editingSubService) return
-    const ident = editingSubService.id ?? editingSubService.name
-    await updateSubService(categoryId, serviceId, ident, updatedData)
-    setEditingSubService(null)
-    await load()
+    
+    try {
+      const ident = editingSubService.id ?? editingSubService.name
+      
+      // Optimistic update - update UI immediately
+      setSvc(prev => ({
+        ...prev,
+        subServices: prev.subServices.map(sub => 
+          (sub.id ?? sub.name) === ident ? { ...sub, ...updatedData } : sub
+        )
+      }))
+      
+      // API call
+      await updateSubService(categoryId, serviceId, ident, updatedData)
+      setEditingSubService(null)
+    } catch (error) {
+      console.error('Failed to update sub-service:', error)
+      setToast({ message: 'Failed to update sub-service. Please try again.', type: 'error' })
+      // Reload on error to revert optimistic update
+      await load()
+    }
+  }
+
+  async function onDeleteSub(subService) {
+    const ident = subService.id ?? subService.name
+    if (confirm(`Delete "${subService.name}" sub-service?`)) {
+      try {
+        // Optimistic update - remove from UI immediately
+        setSvc(prev => ({
+          ...prev,
+          subServices: prev.subServices.filter(sub => 
+            (sub.id ?? sub.name) !== ident
+          )
+        }))
+        
+        // API call
+        await deleteSubService(categoryId, serviceId, ident)
+      } catch (error) {
+        console.error('Failed to delete sub-service:', error)
+        setToast({ message: 'Failed to delete sub-service. Please try again.', type: 'error' })
+        // Reload on error to revert optimistic update
+        await load()
+      }
+    }
   }
 
   if (loading) return (
     <div className="service-edit-page">
-      <div className="loading-state">Loading service...</div>
+      <div className="loading-state">
+        <LoadingSpinner size="large" />
+        <p>Loading service...</p>
+      </div>
     </div>
   )
   
@@ -116,7 +223,7 @@ export default function ServiceEdit() {
           </div>
           <div className="right">
             <button className="btn" type="submit" disabled={saving}>
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? <LoadingSpinner size="small" /> : 'Save Changes'}
             </button>
           </div>
         </form>
@@ -159,7 +266,9 @@ export default function ServiceEdit() {
             onChange={e=> setNewSub(s=> ({...s, maxPrice: Number(e.target.value)}))}
             min="0"
           />
-          <button className="btn" type="submit">Add Sub-Service</button>
+          <button className="btn" type="submit" disabled={addingSub}>
+            {addingSub ? <LoadingSpinner size="small" /> : 'Add Sub-Service'}
+          </button>
         </form>
         
         {subList.length === 0 ? (
@@ -189,13 +298,7 @@ export default function ServiceEdit() {
                   </button>
                   <button 
                     className="btn danger outline" 
-                    onClick={async ()=>{ 
-                      if (confirm(`Delete "${ss.name}" sub-service?`)) { 
-                        const ident = ss.id ?? ss.name
-                        await deleteSubService(categoryId, serviceId, ident)
-                        await load()
-                      }
-                    }}
+                    onClick={() => onDeleteSub(ss)}
                   >
                     Delete
                   </button>
@@ -212,6 +315,15 @@ export default function ServiceEdit() {
           subService={editingSubService}
           onSave={handleEditSubService}
           onClose={() => setEditingSubService(null)}
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
         />
       )}
     </div>

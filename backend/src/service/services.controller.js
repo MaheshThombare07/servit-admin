@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import { db } from '../lib/firebase.js';
+import { getCache, setCache } from '../../lib/cache.js';
 
 const servicesCol = () => db().collection('services');
 
@@ -102,20 +103,42 @@ export async function createService(req, res) {
 
 export async function getService(req, res) {
   const { categoryId, serviceId } = req.params;
+  
+  // Check cache first
+  const cacheKey = `service_${categoryId}_${serviceId}`;
+  let cached = getCache(cacheKey);
+  if (cached) {
+    return res.json(cached);
+  }
+  
   const doc = await serviceCollectionRef(categoryId).doc(serviceId).get();
   if (!doc.exists) return res.status(404).json({ error: 'Service not found' });
+  
   const data = doc.data();
   const subServices = normalizeSubServices(data.subServices);
-  res.json({ id: doc.id, ...data, subServices });
+  const result = { id: doc.id, ...data, subServices };
+  
+  // Cache for 5 minutes
+  setCache(cacheKey, result);
+  
+  res.json(result);
 }
 
 export async function updateService(req, res) {
   const { categoryId, serviceId } = req.params;
   const { value, error } = serviceSchema.fork(['name'], s => s.optional()).validate(req.body);
   if (error) return res.status(400).json({ error: error.message });
+  
   await serviceCollectionRef(categoryId).doc(serviceId).set(value, { merge: true });
   const doc = await serviceCollectionRef(categoryId).doc(serviceId).get();
-  res.json({ id: doc.id, ...doc.data() });
+  
+  const result = { id: doc.id, ...doc.data() };
+  
+  // Clear cache for this service
+  const cacheKey = `service_${categoryId}_${serviceId}`;
+  setCache(cacheKey, null);
+  
+  res.json(result);
 }
 
 export async function deleteService(req, res) {
@@ -124,21 +147,39 @@ export async function deleteService(req, res) {
   res.json({ ok: true });
 }
 
-// Subservices within the array
+// Subservices within array
 export async function addSubService(req, res) {
   const { categoryId, serviceId } = req.params;
   const { value, error } = subServiceSchema.validate(req.body);
   if (error) return res.status(400).json({ error: error.message });
+  
   const docRef = serviceCollectionRef(categoryId).doc(serviceId);
   const doc = await docRef.get();
   if (!doc.exists) return res.status(404).json({ error: 'Service not found' });
+  
   const subServices = normalizeSubServices(doc.data().subServices);
-  // Do not force an id; use name as natural key
-  const exists = subServices.some(s => (s.id ? String(s.id) : s.name) === value.name);
+  
+  // Check for duplicates (case-insensitive)
+  const normalizedName = value.name.trim().toLowerCase();
+  const exists = subServices.some(s => 
+    (s.name || '').toLowerCase() === normalizedName
+  );
   if (exists) return res.status(409).json({ error: 'Subservice with this name already exists' });
-  const newItem = { ...value };
+  
+  // Create new subservice with unique ID
+  const newItem = { 
+    ...value, 
+    id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    name: value.name.trim()
+  };
+  
   subServices.push(newItem);
-  await docRef.set({ subServices }, { merge: true });
+  await docRef.update({ subServices: subServices });
+  
+  // Clear cache for this service
+  const cacheKey = `service_${categoryId}_${serviceId}`;
+  setCache(cacheKey, null);
+  
   res.status(201).json(newItem);
 }
 
@@ -146,15 +187,23 @@ export async function updateSubService(req, res) {
   const { categoryId, serviceId, subId } = req.params;
   const { value, error } = subServiceSchema.fork(['name'], s => s.optional()).validate(req.body);
   if (error) return res.status(400).json({ error: error.message });
+  
   const docRef = serviceCollectionRef(categoryId).doc(serviceId);
   const doc = await docRef.get();
   if (!doc.exists) return res.status(404).json({ error: 'Service not found' });
+  
   const list = normalizeSubServices(doc.data().subServices);
-  // Support lookups by explicit id or by name (for legacy data without ids)
   const idx = list.findIndex(s => String(s.id ?? s.name) === String(subId));
   if (idx === -1) return res.status(404).json({ error: 'Subservice not found' });
+  
+  // Update the subservice
   list[idx] = { ...list[idx], ...value };
   await docRef.update({ subServices: list });
+  
+  // Clear cache for this service
+  const cacheKey = `service_${categoryId}_${serviceId}`;
+  setCache(cacheKey, null);
+  
   res.json(list[idx]);
 }
 
@@ -163,7 +212,19 @@ export async function deleteSubService(req, res) {
   const docRef = serviceCollectionRef(categoryId).doc(serviceId);
   const doc = await docRef.get();
   if (!doc.exists) return res.status(404).json({ error: 'Service not found' });
-  const list = normalizeSubServices(doc.data().subServices).filter(s => String(s.id ?? s.name) !== String(subId));
-  await docRef.update({ subServices: list });
+  
+  const list = normalizeSubServices(doc.data().subServices);
+  const filteredList = list.filter(s => String(s.id ?? s.name) !== String(subId));
+  
+  if (filteredList.length === list.length) {
+    return res.status(404).json({ error: 'Subservice not found' });
+  }
+  
+  await docRef.update({ subServices: filteredList });
+  
+  // Clear cache for this service
+  const cacheKey = `service_${categoryId}_${serviceId}`;
+  setCache(cacheKey, null);
+  
   res.json({ ok: true });
 }

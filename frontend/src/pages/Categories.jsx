@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { createCategory, getCategories, toggleCategory } from '../api'
+import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import './Categories.css'
 
 export default function Categories() {
@@ -22,9 +23,24 @@ export default function Categories() {
   async function onCreate(cat) {
     setCreating(true)
     try {
-      await createCategory(cat)
-      await load()
-    } finally { setCreating(false) }
+      const newCategory = await createCategory(cat)
+      // Add to state immediately instead of reloading
+      setItems(prev => [...prev, newCategory].sort((a,b)=> a.id.localeCompare(b.id)))
+    } finally { 
+      setCreating(false) 
+    }
+  }
+
+  async function onToggleStatus(categoryId, currentStatus) {
+    try {
+      await toggleCategory(categoryId, !currentStatus)
+      // Update state immediately instead of reloading
+      setItems(prev => prev.map(item => 
+        item.id === categoryId ? { ...item, isActive: !currentStatus } : item
+      ))
+    } catch (error) {
+      console.error('Failed to toggle category status:', error)
+    }
   }
 
   return (
@@ -37,7 +53,10 @@ export default function Categories() {
         </div>
       </div>
       {loading ? (
-        <div className="loading-state">Loading...</div>
+        <div className="loading-state">
+          <LoadingSpinner size="large" />
+          <p>Loading categories...</p>
+        </div>
       ) : items.length === 0 ? (
         <div className="empty-state">
           <h3>No Categories Yet</h3>
@@ -58,10 +77,12 @@ export default function Categories() {
               </div>
               <div className="card-actions">
                 <Link className="btn" to={`/categories/${it.id}`}>Open Services</Link>
-                <button className="btn outline" onClick={async ()=> {
-                  await toggleCategory(it.id, !it.isActive)
-                  await load()
-                }}>{it.isActive? 'Deactivate' : 'Activate'}</button>
+                <button 
+                  className="btn outline" 
+                  onClick={() => onToggleStatus(it.id, it.isActive)}
+                >
+                  {it.isActive? 'Deactivate' : 'Activate'}
+                </button>
               </div>
             </div>
           ))}

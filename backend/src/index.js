@@ -20,26 +20,17 @@ const app = express();
 /* -------------------- Firebase -------------------- */
 ensureFirebaseInitialized();
 
-/* -------------------- CORS (FINAL, STABLE) -------------------- */
-/*
-  - Works with Vercel frontend
-  - Works with Render backend
-  - Passes OPTIONS preflight
-  - Supports credentials
-  - Do NOT change this
-*/
+/* -------------------- CORS -------------------- */
 app.use(cors({
-  origin: true,          // reflect request origin
+  origin: process.env.CORS_ORIGIN?.split(',') || '*', 
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+app.options('*', cors());
 
-app.options('*', cors({
-  origin: true,
-  credentials: true,
-}));
-
-/* -------------------- Middleware -------------------- */
 app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(morgan('dev'));
 
 /* -------------------- Health Check -------------------- */

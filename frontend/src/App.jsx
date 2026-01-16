@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import Services from './pages/Services.jsx'
 import ServiceEdit from './pages/ServiceEdit.jsx'
 import Partners from './pages/Partners.jsx'
+import PartnerDetail from './pages/PartnerDetail.jsx'
 import Users from './pages/Users.jsx'
 import UserDetail from './pages/UserDetail.jsx'
 import BookingHistory from './pages/BookingHistory.jsx'
@@ -39,21 +40,21 @@ function DashboardLayout() {
           <button className="icon-btn" aria-label="Close sidebar" onClick={() => setSidebarOpen(false)}>✕</button>
         </div>
         <nav>
-          <NavLink to="/" end className={({isActive})=> isActive? 'active' : ''}>Dashboard</NavLink>
+          <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}>Dashboard</NavLink>
           {hasAccess('categories') && (
-            <NavLink to="/categories" className={({isActive})=> isActive? 'active' : ''}>Categories</NavLink>
+            <NavLink to="/categories" className={({ isActive }) => isActive ? 'active' : ''}>Categories</NavLink>
           )}
           {hasAccess('partners') && (
-            <NavLink to="/partners" className={({isActive})=> isActive? 'active' : ''}>Partners</NavLink>
+            <NavLink to="/partners" className={({ isActive }) => isActive ? 'active' : ''}>Partners</NavLink>
           )}
           {hasAccess('users') && (
-            <NavLink to="/users" className={({isActive})=> isActive? 'active' : ''}>Users</NavLink>
+            <NavLink to="/users" className={({ isActive }) => isActive ? 'active' : ''}>Users</NavLink>
           )}
           {hasAccess('bookings') && (
-            <NavLink to="/bookings" className={({isActive})=> isActive? 'active' : ''}>All Bookings</NavLink>
+            <NavLink to="/bookings" className={({ isActive }) => isActive ? 'active' : ''}>All Bookings</NavLink>
           )}
           {hasAccess('settings') && (
-            <NavLink to="/admin-management" className={({isActive})=> isActive? 'active' : ''}>Admin Management</NavLink>
+            <NavLink to="/admin-management" className={({ isActive }) => isActive ? 'active' : ''}>Admin Management</NavLink>
           )}
         </nav>
       </aside>
@@ -109,6 +110,7 @@ export default function App() {
           <Route path="/categories/:categoryId" element={<Services />} />
           <Route path="/categories/:categoryId/services/:serviceId" element={<ServiceEdit />} />
           <Route path="/partners" element={<Partners />} />
+          <Route path="/partners/:partnerId" element={<PartnerDetail />} />
           <Route path="/users" element={<Users />} />
           <Route path="/users/:userId" element={<UserDetail />} />
           <Route path="/users/:userId/bookings" element={<BookingHistory />} />

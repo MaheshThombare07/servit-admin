@@ -9,6 +9,7 @@ import usersRouter from './routes/users.js';
 import bookingsRouter from './routes/bookings.js';
 import authRouter from './routes/auth.js';
 import adminRouter from './routes/admin.js';
+import dashboardRouter from './routes/dashboard.js';
 
 import { requireAuth } from './middleware/auth.js';
 import { ensureFirebaseInitialized } from './lib/firebase.js';
@@ -22,7 +23,7 @@ ensureFirebaseInitialized();
 
 /* -------------------- CORS -------------------- */
 app.use(cors({
-  origin: process.env.CORS_ORIGIN?.split(',') || '*', 
+  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'], // Add all possible frontend ports
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -48,6 +49,7 @@ app.use('/api', partnersRouter);
 app.use('/api', usersRouter);
 app.use('/api', bookingsRouter);
 app.use('/api', adminRouter);
+app.use('/api', dashboardRouter);
 
 /* -------------------- Server -------------------- */
 const PORT = process.env.PORT || 5050;

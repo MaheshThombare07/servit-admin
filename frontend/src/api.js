@@ -2,6 +2,8 @@ import axios from 'axios'
 
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5050/api'
 
+console.log('API Base URL:', baseURL) // Debug line to verify correct URL
+
 const authTokenKey = 'servite_admin_token'
 
 export const api = axios.create({ 
@@ -237,3 +239,25 @@ export async function getBookingDetails(bookingId) {
   const { data } = await api.get(`/bookings/${bookingId}`)
   return data
 }
+
+// Dashboard API
+export async function getDashboardStats() {
+  const { data } = await api.get('/dashboard/stats')
+  return data
+}
+
+export async function getRecentBookings() {
+  const { data } = await api.get('/dashboard/recent-bookings')
+  return data
+}
+
+export async function getPendingValidations() {
+  const { data } = await api.get('/dashboard/pending-validations')
+  return data
+}
+
+export async function getBookingTrends() {
+  const { data } = await api.get('/dashboard/booking-trends')
+  return data
+}
+

@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { FiSearch } from 'react-icons/fi'
 import { getPartners, getPartner, verifyPartner, rejectPartner } from '../api'
+import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import './Partners.css'
 
 export default function Partners() {
+  const navigate = useNavigate()
   const [partners, setPartners] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('pending_verification') // pending_verification, verified, rejected
@@ -11,20 +15,44 @@ export default function Partners() {
   const [rejectForm, setRejectForm] = useState({ rejectionReason: '', remark: '' })
   const [actionLoading, setActionLoading] = useState(false)
   const [zoomedImage, setZoomedImage] = useState(null)
+  const [lastLoadTime, setLastLoadTime] = useState(0)
+  const [cache, setCache] = useState(new Map()) // Simple in-memory cache
+  const [searchQuery, setSearchQuery] = useState('') // Search filter
 
-  async function load() {
+  // Cache data for 5 minutes to prevent unnecessary reloads
+  const CACHE_DURATION = 5 * 60 * 1000
+
+  const load = useCallback(async (forceRefresh = false) => {
+    const now = Date.now()
+    const cacheKey = `partners_${filter}`
+    const cached = cache.get(cacheKey)
+
+    // Return cached data if fresh and not forcing refresh
+    if (!forceRefresh && cached && (now - cached.timestamp) < CACHE_DURATION) {
+      setPartners(cached.data)
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     try {
       const data = await getPartners(filter === 'all' ? null : filter)
       setPartners(data)
+
+      // Update cache
+      setCache(prev => new Map(prev.set(cacheKey, {
+        data,
+        timestamp: now
+      })))
+      setLastLoadTime(now)
     } finally {
       setLoading(false)
     }
-  }
+  }, [filter, cache])
 
   useEffect(() => {
     load()
-  }, [filter])
+  }, [load])
 
   // Debug: Log partner data when selected
   useEffect(() => {
@@ -38,16 +66,28 @@ export default function Partners() {
 
   async function handleVerify(partnerId, remark = '') {
     if (!confirm('Are you sure you want to verify this partner?')) return
-    
+
     setActionLoading(true)
     try {
       await verifyPartner(partnerId, remark)
-      await load()
+
+      // Optimistic update - remove from list immediately
+      setPartners(prev => prev.filter(p => p.id !== partnerId))
+
+      // Clear cache to force refresh next time
+      setCache(prev => {
+        const newCache = new Map(prev)
+        newCache.delete(`partners_${filter}`)
+        return newCache
+      })
+
       if (selectedPartner?.id === partnerId) {
         setSelectedPartner(null)
       }
     } catch (error) {
       alert('Error verifying partner: ' + (error.response?.data?.error || error.message))
+      // Reload on error to revert optimistic update
+      await load(true)
     } finally {
       setActionLoading(false)
     }
@@ -64,12 +104,24 @@ export default function Partners() {
       await rejectPartner(partnerId, rejectForm.rejectionReason, rejectForm.remark)
       setShowRejectModal(false)
       setRejectForm({ rejectionReason: '', remark: '' })
-      await load()
+
+      // Optimistic update - remove from list immediately
+      setPartners(prev => prev.filter(p => p.id !== partnerId))
+
+      // Clear cache to force refresh next time
+      setCache(prev => {
+        const newCache = new Map(prev)
+        newCache.delete(`partners_${filter}`)
+        return newCache
+      })
+
       if (selectedPartner?.id === partnerId) {
         setSelectedPartner(null)
       }
     } catch (error) {
       alert('Error rejecting partner: ' + (error.response?.data?.error || error.message))
+      // Reload on error to revert optimistic update
+      await load(true)
     } finally {
       setActionLoading(false)
     }
@@ -83,59 +135,83 @@ export default function Partners() {
 
   function formatDate(timestamp) {
     if (!timestamp) return 'N/A'
-    
+
     // Handle Firestore timestamp object
     if (timestamp && typeof timestamp === 'object' && timestamp._seconds) {
       return new Date(timestamp._seconds * 1000).toLocaleString()
     }
-    
+
     // Handle Unix timestamp (number)
     if (typeof timestamp === 'number') {
       return new Date(timestamp).toLocaleString()
     }
-    
+
     // Handle string date
     if (typeof timestamp === 'string') {
       return new Date(timestamp).toLocaleString()
     }
-    
+
     return 'N/A'
   }
 
   return (
     <div className="partners-page">
       <div className="page-header">
-        <h1>Partner Verification</h1>
-        <div className="filter-tabs">
-          <button 
-            className={`filter-tab ${filter === 'pending_verification' ? 'active' : ''}`}
-            onClick={() => setFilter('pending_verification')}
+        <div className="header-left">
+          <h1>Partner Verification</h1>
+          <div className="filter-tabs">
+            <button
+              className={`filter-tab ${filter === 'pending_verification' ? 'active' : ''}`}
+              onClick={() => setFilter('pending_verification')}
+            >
+              Pending
+            </button>
+            <button
+              className={`filter-tab ${filter === 'verified' ? 'active' : ''}`}
+              onClick={() => setFilter('verified')}
+            >
+              Verified
+            </button>
+            <button
+              className={`filter-tab ${filter === 'rejected' ? 'active' : ''}`}
+              onClick={() => setFilter('rejected')}
+            >
+              Rejected
+            </button>
+            <button
+              className={`filter-tab ${filter === 'all' ? 'active' : ''}`}
+              onClick={() => setFilter('all')}
+            >
+              All
+            </button>
+          </div>
+        </div>
+        <div className="header-actions">
+          <div className="search-bar-container">
+            <FiSearch className="search-icon" />
+            <input
+              type="text"
+              className="search-bar"
+              placeholder="Search providers..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <button
+            className="btn outline"
+            onClick={() => load(true)}
+            disabled={loading}
           >
-            Pending
-          </button>
-          <button 
-            className={`filter-tab ${filter === 'verified' ? 'active' : ''}`}
-            onClick={() => setFilter('verified')}
-          >
-            Verified
-          </button>
-          <button 
-            className={`filter-tab ${filter === 'rejected' ? 'active' : ''}`}
-            onClick={() => setFilter('rejected')}
-          >
-            Rejected
-          </button>
-          <button 
-            className={`filter-tab ${filter === 'all' ? 'active' : ''}`}
-            onClick={() => setFilter('all')}
-          >
-            All
+            {loading ? <LoadingSpinner size="small" /> : 'Refresh'}
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="loading-state">Loading partners...</div>
+        <div className="loading-state">
+          <LoadingSpinner size="large" />
+          <p>Loading partners...</p>
+        </div>
       ) : partners.length === 0 ? (
         <div className="empty-state">
           <h3>No Partners Found</h3>
@@ -143,65 +219,62 @@ export default function Partners() {
         </div>
       ) : (
         <div className="partners-container">
-          <div className="partners-list">
-            {partners.map(partner => (
-              <div 
-                key={partner.id} 
-                className={`partner-card ${selectedPartner?.id === partner.id ? 'selected' : ''}`}
-                onClick={async () => {
-                  // Fetch full partner details to ensure we have all fields
-                  try {
-                    const fullPartner = await getPartner(partner.id)
-                    setSelectedPartner(fullPartner)
-                  } catch (error) {
-                    console.error('Error fetching partner details:', error)
-                    // Fallback to list data if fetch fails
-                    setSelectedPartner(partner)
-                  }
-                }}
-              >
-                <div className="partner-card-header">
-                  <div className="partner-avatar">
-                    {console.log("profile images url=================",partner.profilePhotoUrl)}
-                    {partner?.profilePhotoUrl ? (
-                      <img 
-                        src={partner.profilePhotoUrl} 
-                        alt={partner.personalDetails?.fullName || 'Partner'}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          const placeholder = e.target.nextElementSibling;
-                          if (placeholder) placeholder.style.display = 'flex';
-                        }}
-                      />
-                    ) : null}
-                    <div 
-                      className="avatar-placeholder"
-                      style={{ display: partner?.profilePhotoUrl ? 'none' : 'flex' }}
-                    >
-                      {(partner.personalDetails?.fullName || partner.fullName || 'P')[0]?.toUpperCase() || 'P'}
+          <div className="partners-grid">
+            {partners
+              .filter(p => {
+                if (!searchQuery) return true;
+                const query = searchQuery.toLowerCase();
+                const name = (p.personalDetails?.fullName || p.fullName || '').toLowerCase();
+                const email = (p.email || '').toLowerCase();
+                return name.includes(query) || email.includes(query);
+              })
+              .map(partner => (
+                <div
+                  key={partner.id}
+                  className={`partner-card ${selectedPartner?.id === partner.id ? 'selected' : ''}`}
+                  onClick={() => navigate(`/partners/${partner.id}`)}
+                >
+                  <div className="partner-card-header">
+                    <div className="partner-avatar">
+                      {partner?.profilePhotoUrl && (
+                        <img
+                          src={partner.profilePhotoUrl}
+                          alt={partner.personalDetails?.fullName || 'Partner'}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            const placeholder = e.target.nextElementSibling;
+                            if (placeholder) placeholder.style.display = 'flex';
+                          }}
+                        />
+                      )}
+                      <div
+                        className="avatar-placeholder"
+                        style={{ display: partner?.profilePhotoUrl ? 'none' : 'flex' }}
+                      >
+                        {(partner.personalDetails?.fullName || partner.fullName || 'P')[0]?.toUpperCase() || 'P'}
+                      </div>
+                    </div>
+                    <div className="partner-info">
+                      <div className="partner-name">{partner.personalDetails?.fullName || partner.fullName || 'N/A'}</div>
+                      <div className="partner-email">{partner.email || 'N/A'}</div>
+                      <div className="partner-phone">{partner.personalDetails?.mobileNo || partner.personalDetails?.phoneNumber || 'N/A'}</div>
                     </div>
                   </div>
-                  <div className="partner-info">
-                    <div className="partner-name">{partner.personalDetails?.fullName || partner.fullName || 'N/A'}</div>
-                    <div className="partner-email">{partner.email || 'N/A'}</div>
-                    <div className="partner-phone">{partner.personalDetails?.mobileNo || partner.personalDetails?.phoneNumber || 'N/A'}</div>
-                  </div>
-                </div>
-                <div className="partner-card-footer">
-                  <div className={`status-badge ${partner.status || 'pending'}`}>
-                    {partner.status || 'pending_verification'}
-                  </div>
-                  {partner.services && (
-                    <div className="partner-services">
-                      {partner.services.slice(0, 3).map(s => (
-                        <span key={s} className="service-tag">{s}</span>
-                      ))}
-                      {partner.services.length > 3 && <span className="service-tag">+{partner.services.length - 3}</span>}
+                  <div className="partner-card-footer">
+                    <div className={`status-badge ${partner.status || 'pending'}`}>
+                      {partner.status || 'pending_verification'}
                     </div>
-                  )}
+                    {partner.services && (
+                      <div className="partner-services">
+                        {partner.services.slice(0, 3).map(s => (
+                          <span key={s} className="service-tag">{s}</span>
+                        ))}
+                        {partner.services.length > 3 && <span className="service-tag">+{partner.services.length - 3}</span>}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
 
           {selectedPartner && (
@@ -209,6 +282,57 @@ export default function Partners() {
               <div className="details-header">
                 <h2>Partner Details</h2>
                 <button className="icon-btn" onClick={() => setSelectedPartner(null)}>✕</button>
+              </div>
+
+              {/* Large Profile Header - Like mockup */}
+              <div className="profile-header">
+                <div className="profile-header-left">
+                  <div className="profile-avatar-large">
+                    {selectedPartner?.profilePhotoUrl ? (
+                      <img
+                        src={selectedPartner.profilePhotoUrl}
+                        alt={selectedPartner.personalDetails?.fullName || 'Partner'}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          const placeholder = e.target.nextElementSibling;
+                          if (placeholder) placeholder.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className="avatar-placeholder-large"
+                      style={{ display: selectedPartner?.profilePhotoUrl ? 'none' : 'flex' }}
+                    >
+                      {(selectedPartner.personalDetails?.fullName || selectedPartner.fullName || 'P')[0]?.toUpperCase() || 'P'}
+                    </div>
+                    <div className="online-indicator"></div>
+                  </div>
+                  <div className="profile-header-info">
+                    <h1 className="profile-name">{selectedPartner.personalDetails?.fullName || selectedPartner.fullName || 'N/A'}</h1>
+                    <div className="profile-meta">
+                      {selectedPartner.services && selectedPartner.services.length > 0 && (
+                        <>
+                          <span className="profile-service">⚡ {selectedPartner.services[0]}</span>
+                          <span className="profile-divider">•</span>
+                        </>
+                      )}
+                      <span className="profile-id">ID: {selectedPartner.id?.substring(0, 8).toUpperCase() || 'N/A'}</span>
+                    </div>
+                    <div className={`profile-status-badge ${selectedPartner.status || 'pending_verification'}`}>
+                      {selectedPartner.status === 'pending_verification' ? '● Pending Review' :
+                        selectedPartner.status === 'verified' ? '● Verified' :
+                          selectedPartner.status === 'rejected' ? '● Rejected' : '● Pending Review'}
+                    </div>
+                  </div>
+                </div>
+                <div className="profile-header-actions">
+                  <button className="btn-header outline">
+                    <span>✉</span> Message
+                  </button>
+                  <button className="btn-header outline">
+                    <span>🕐</span> History
+                  </button>
+                </div>
               </div>
 
               <div className="details-content">
@@ -254,9 +378,9 @@ export default function Partners() {
                     <div className="detail-item full-width">
                       <label>Profile Image</label>
                       <div className="image-container">
-                        <img 
-                          src={selectedPartner.profilePhotoUrl} 
-                          alt="Profile" 
+                        <img
+                          src={selectedPartner.profilePhotoUrl}
+                          alt="Profile"
                           className="detail-image profile-img"
                           onError={(e) => {
                             e.target.style.display = 'none';
@@ -322,7 +446,7 @@ export default function Partners() {
                       'documents.aadhaarFrontUrl',
                       'documents.aadhaarFront'
                     );
-                    
+
                     const aadhaarBack = getField(
                       selectedPartner,
                       'aadhaarBackUrl',
@@ -338,7 +462,7 @@ export default function Partners() {
                           No documents uploaded
                           {process.env.NODE_ENV === 'development' && (
                             <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--muted)' }}>
-                              Debug: aadhaarFrontUrl = {String(selectedPartner.aadhaarFrontUrl)}, 
+                              Debug: aadhaarFrontUrl = {String(selectedPartner.aadhaarFrontUrl)},
                               aadhaarBackUrl = {String(selectedPartner.aadhaarBackUrl)}
                             </div>
                           )}
@@ -351,14 +475,14 @@ export default function Partners() {
                         {aadhaarFront && (
                           <div className="document-item">
                             <label>Aadhaar Front</label>
-                            <div 
+                            <div
                               className="document-image-wrapper"
                               onClick={() => setZoomedImage(aadhaarFront)}
                               style={{ cursor: 'pointer' }}
                             >
-                              <img 
-                                src={aadhaarFront} 
-                                alt="Aadhaar Front" 
+                              <img
+                                src={aadhaarFront}
+                                alt="Aadhaar Front"
                                 className="document-image"
                                 onError={(e) => {
                                   e.target.style.display = 'none';
@@ -379,14 +503,14 @@ export default function Partners() {
                         {aadhaarBack && (
                           <div className="document-item">
                             <label>Aadhaar Back</label>
-                            <div 
+                            <div
                               className="document-image-wrapper"
                               onClick={() => setZoomedImage(aadhaarBack)}
                               style={{ cursor: 'pointer' }}
                             >
-                              <img 
-                                src={aadhaarBack} 
-                                alt="Aadhaar Back" 
+                              <img
+                                src={aadhaarBack}
+                                alt="Aadhaar Back"
                                 className="document-image"
                                 onError={(e) => {
                                   e.target.style.display = 'none';
@@ -484,15 +608,15 @@ export default function Partners() {
                 {/* Actions */}
                 {selectedPartner.status === 'pending_verification' && (
                   <div className="details-actions">
-                    <button 
-                      className="btn success" 
+                    <button
+                      className="btn success"
                       onClick={() => handleVerify(selectedPartner.id)}
                       disabled={actionLoading}
                     >
                       ✓ Verify Partner
                     </button>
-                    <button 
-                      className="btn danger outline" 
+                    <button
+                      className="btn danger outline"
                       onClick={() => openRejectModal(selectedPartner)}
                       disabled={actionLoading}
                     >

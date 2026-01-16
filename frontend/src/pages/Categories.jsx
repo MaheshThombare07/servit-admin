@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { createCategory, getCategories, toggleCategory } from '../api'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
@@ -8,17 +8,42 @@ export default function Categories() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [cache, setCache] = useState(new Map())
+  const [lastLoadTime, setLastLoadTime] = useState(0)
 
-  async function load() {
+  // Cache data for 5 minutes
+  const CACHE_DURATION = 5 * 60 * 1000
+
+  const load = useCallback(async (forceRefresh = false) => {
+    const now = Date.now()
+    const cacheKey = 'categories'
+    const cached = cache.get(cacheKey)
+
+    // Return cached data if fresh and not forcing refresh
+    if (!forceRefresh && cached && (now - cached.timestamp) < CACHE_DURATION) {
+      setItems(cached.data)
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     try {
       const data = await getCategories()
       const ordered = data.sort((a,b)=> a.id.localeCompare(b.id))
       setItems(ordered)
-    } finally { setLoading(false) }
-  }
+      
+      // Update cache
+      setCache(prev => new Map(prev.set(cacheKey, {
+        data: ordered,
+        timestamp: now
+      })))
+      setLastLoadTime(now)
+    } finally { 
+      setLoading(false) 
+    }
+  }, [cache])
 
-  useEffect(()=>{ load() }, [])
+  useEffect(()=>{ load() }, [load])
 
   async function onCreate(cat) {
     setCreating(true)
@@ -26,6 +51,13 @@ export default function Categories() {
       const newCategory = await createCategory(cat)
       // Add to state immediately instead of reloading
       setItems(prev => [...prev, newCategory].sort((a,b)=> a.id.localeCompare(b.id)))
+      
+      // Clear cache to force refresh next time
+      setCache(prev => {
+        const newCache = new Map(prev)
+        newCache.delete('categories')
+        return newCache
+      })
     } finally { 
       setCreating(false) 
     }
@@ -38,6 +70,13 @@ export default function Categories() {
       setItems(prev => prev.map(item => 
         item.id === categoryId ? { ...item, isActive: !currentStatus } : item
       ))
+      
+      // Clear cache to force refresh next time
+      setCache(prev => {
+        const newCache = new Map(prev)
+        newCache.delete('categories')
+        return newCache
+      })
     } catch (error) {
       console.error('Failed to toggle category status:', error)
     }
@@ -46,10 +85,19 @@ export default function Categories() {
   return (
     <div className="categories-page">
       <div className="page-header">
-        <h1>Categories</h1>
-        <div className="actions">
-          <button className="btn" disabled={creating} onClick={()=> onCreate('men')}>Create Men</button>
-          <button className="btn" disabled={creating} onClick={()=> onCreate('women')}>Create Women</button>
+        <div className="header-left">
+          <h1>Categories</h1>
+        </div>
+        <div className="header-actions">
+          <button className="btn outline" onClick={() => load(true)} disabled={loading}>
+            {loading ? <LoadingSpinner size="small" /> : 'Refresh'}
+          </button>
+          <button className="btn" disabled={creating} onClick={()=> onCreate('men')}>
+            {creating ? <LoadingSpinner size="small" /> : 'Create Men'}
+          </button>
+          <button className="btn" disabled={creating} onClick={()=> onCreate('women')}>
+            Create Women
+          </button>
         </div>
       </div>
       {loading ? (

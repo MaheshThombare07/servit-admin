@@ -1,0 +1,46 @@
+
+/* Service Expertise - Clean Transparent Design */
+.service-expertise-item {
+  margin-bottom: 32px;
+}
+
+.service-expertise-item:last-child {
+  margin-bottom: 0;
+}
+
+.service-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.service-badge-large {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: var(--primary);
+  color: white;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+
+.sub-services-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.sub-services-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}

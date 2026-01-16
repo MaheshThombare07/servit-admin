@@ -23,7 +23,7 @@ ensureFirebaseInitialized();
 
 /* -------------------- CORS -------------------- */
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'], // Add all possible frontend ports
+  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000','admin.serveit.app'], // Add all possible frontend ports
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
